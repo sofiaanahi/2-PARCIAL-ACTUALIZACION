@@ -1,85 +1,138 @@
+// Función asíncrona para configurar la cámara y obtener el stream de video
 async function setupCamera() {
-    const video = document.getElementById('video'); // Obtiene el elemento de video del DOM
+    // Obtiene el elemento de video del DOM
+    const video = document.getElementById('video');
+    // Solicita acceso a la cámara con una resolución de 320x240 sin audio
     const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 320, height: 240 }, // Configura la resolución del video
-        audio: false // Desactiva el audio
+        video: { width: 320, height: 240 },
+        audio: false
     });
-    video.srcObject = stream; // Asigna el stream de video al elemento de video
+    // Asigna el stream de video al elemento de video
+    video.srcObject = stream;
+    // Retorna una promesa que se resuelve cuando los metadatos del video se han cargado
     return new Promise(resolve => {
         video.onloadedmetadata = () => {
-            resolve(video); // Resuelve la promesa una vez que los metadatos del video están cargados
+            resolve(video);
         };
     });
 }
 
+// Función principal asíncrona
 async function main() {
-    const video = await setupCamera(); // Configura la cámara y obtiene el elemento de video
+    // Configura la cámara y espera a que esté lista
+    const video = await setupCamera();
     video.play(); // Reproduce el video
 
-    const model = await handpose.load(); // Carga el modelo de Handpose para detección de manos
+    // Carga el modelo de handpose para la detección de manos
+    const model = await handpose.load();
 
-    const leftCanvas = document.getElementById('izquierdaCanvas'); // Obtiene el canvas para la mano izquierda
-    const rightCanvas = document.getElementById('derechaCanvas'); // Obtiene el canvas para la mano derecha
-    const leftCtx = leftCanvas.getContext('2d'); // Obtiene el contexto de dibujo para el canvas de la mano izquierda
-    const rightCtx = rightCanvas.getContext('2d'); // Obtiene el contexto de dibujo para el canvas de la mano derecha
+    // Obtiene los elementos de canvas y sus contextos de dibujo
+    const leftCanvas = document.getElementById('izquierdaCanvas');
+    const rightCanvas = document.getElementById('derechaCanvas');
+    const leftCtx = leftCanvas.getContext('2d');
+    const rightCtx = rightCanvas.getContext('2d');
 
-    // Almacena las últimas posiciones de las manos detectadas
+    // Obtiene las imágenes y elementos de texto del DOM
+    const pazImage = document.getElementById('paz');
+    const chocaLos5Image = document.getElementById('chocaLos5Image');
+    const p_chocalas = document.getElementById('p_chocalas')
+
+    // Inicializa variables para almacenar las posiciones de las manos detectadas previamente
     let lastLeftHand = null;
     let lastRightHand = null;
 
-    // Función para detectar manos
+    // Función asíncrona para detectar manos en el video
     async function detectHands() {
-        const predictions = await model.estimateHands(video, true); // Estima las manos en el video
+        // Estima las posiciones de las manos en el video
+        const predictions = await model.estimateHands(video, true);
 
-        // Limpia ambos canvases antes de dibujar
+        // Limpia los canvas antes de dibujar
         leftCtx.clearRect(0, 0, leftCanvas.width, leftCanvas.height);
         rightCtx.clearRect(0, 0, rightCanvas.width, rightCanvas.height);
 
-        let leftHand = null; // Variable para almacenar los landmarks de la mano izquierda
-        let rightHand = null; // Variable para almacenar los landmarks de la mano derecha
+        // Inicializa variables para las manos izquierda y derecha
+        let leftHand = null;
+        let rightHand = null;
 
-        // Itera sobre cada predicción de mano
+        // Itera sobre las predicciones para separar las manos izquierda y derecha
         predictions.forEach(prediction => {
-            const landmarks = prediction.landmarks; // Obtiene los landmarks de la mano
-            const centerX = (landmarks.reduce((sum, point) => sum + point[0], 0)) / landmarks.length; // Calcula el centro X de la mano
+            const landmarks = prediction.landmarks;
+            // Calcula la posición horizontal promedio de la mano
+            const centerX = (landmarks.reduce((sum, point) => sum + point[0], 0)) / landmarks.length;
 
-            // Determina si la mano está en el lado izquierdo o derecho del video
+            // Determina si la mano está a la izquierda o a la derecha del video
             if (centerX < video.videoWidth / 2) {
-                leftHand = landmarks; // Mano izquierda detectada
+                leftHand = landmarks;
             } else {
-                rightHand = landmarks; // Mano derecha detectada
+                rightHand = landmarks;
             }
         });
 
-        // Si se detecta una mano izquierda, dibújala o utiliza la última posición conocida
+        // Dibuja la mano izquierda si se ha detectado una o usa la última posición conocida
         if (leftHand || lastLeftHand) {
-            drawHand(leftHand || lastLeftHand, leftCtx, 'blue'); // Dibuja la mano izquierda o la última posición conocida
-            lastLeftHand = leftHand || lastLeftHand; // Actualiza la última posición conocida
+            drawHand(leftHand || lastLeftHand, leftCtx, 'blue');
+            lastLeftHand = leftHand || lastLeftHand;
         }
 
-        // Si se detecta una mano derecha, dibújala o utiliza la última posición conocida
+        // Dibuja la mano derecha si se ha detectado una o usa la última posición conocida
         if (rightHand || lastRightHand) {
-            drawHand(rightHand || lastRightHand, rightCtx, 'red'); // Dibuja la mano derecha o la última posición conocida
-            lastRightHand = rightHand || lastRightHand; // Actualiza la última posición conocida
+            drawHand(rightHand || lastRightHand, rightCtx, 'red');
+            lastRightHand = rightHand || lastRightHand;
         }
 
-        requestAnimationFrame(detectHands); // Llama a detectHands en el siguiente frame para actualización continua
+        // Detecta gestos y muestra las imágenes correspondientes
+        if (leftHand || rightHand) {
+            const gesture = detectGesture(leftHand || rightHand);
+            if (gesture === "chocaLos5") {
+                chocaLos5Image.style.display = 'block';
+                p_chocalas.style.display = 'block';
+                pazImage.style.display = 'none';
+            } else {
+                pazImage.style.display = 'none';
+                chocaLos5Image.style.display = 'none';
+            }
+        } else {
+            pazImage.style.display = 'none';
+            chocaLos5Image.style.display = 'none';
+        }
+
+        // Llama a la función de detección de manos nuevamente en el próximo cuadro de animación
+        requestAnimationFrame(detectHands);
     }
 
-    // Función para dibujar una mano
+    // Función para detectar gestos basados en la posición de los puntos de referencia de la mano
+    function detectGesture(landmarks) {
+        if (!landmarks) return "ninguno";
+        const thumbTip = landmarks[4];
+        const indexTip = landmarks[8];
+        const middleTip = landmarks[12];
+
+        // Define gestos basados en la posición vertical de los dedos
+        if (thumbTip[1] < indexTip[1] && thumbTip[1] < middleTip[1]) {
+            return "paz";
+        } else if (thumbTip[1] > indexTip[1] && thumbTip[1] > middleTip[1]) {
+            return "chocaLos5";
+        } else {
+            return "ninguno";
+        }
+    }
+
+    // Función para dibujar una mano en el canvas
     function drawHand(landmarks, ctx, color) {
-        ctx.fillStyle = color; // Establece el color de relleno
+        ctx.fillStyle = color;
+        // Dibuja cada punto de referencia como un círculo
         landmarks.forEach(([x, y]) => {
-            // Ajusta las coordenadas a las dimensiones del canvas
             const adjustedX = x / video.videoWidth * ctx.canvas.width;
             const adjustedY = y / video.videoHeight * ctx.canvas.height;
-            ctx.beginPath(); // Comienza un nuevo camino de dibujo
-            ctx.arc(adjustedX, adjustedY, 5, 0, 2 * Math.PI); // Dibuja un círculo en cada landmark
-            ctx.fill(); // Rellena el círculo
+            ctx.beginPath();
+            ctx.arc(adjustedX, adjustedY, 5, 0, 2 * Math.PI);
+            ctx.fill();
         });
     }
 
-    detectHands(); // Inicia la detección de manos
+    // Inicia la detección de manos
+    detectHands();
 }
 
-main(); // Ejecuta la función principal
+// Llama a la función principal para iniciar todo el proceso
+main();
