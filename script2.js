@@ -86,14 +86,9 @@ async function main() {
             if (gesture === "chocaLos5") {
                 chocaLos5Image.style.display = 'block';
                 p_chocalas.style.display = 'block';
-                pazImage.style.display = 'none';
-            } else {
-                pazImage.style.display = 'none';
-                chocaLos5Image.style.display = 'none';
+                
             }
-        } else {
-            pazImage.style.display = 'none';
-            chocaLos5Image.style.display = 'none';
+        
         }
 
         // Llama a la función de detección de manos nuevamente en el próximo cuadro de animación
